@@ -14,9 +14,21 @@ ui <- fluidPage(
     
     linebreaks(1),
     
+    p("This is an example of a report generator. It accepts one file upload."), 
+    
+    p("The file for this example may be downloaded ", 
+      a(href = "https://stackoverflow.com/", "here", 
+        .noWS = "outside"), 
+      ".", 
+      .noWS = c("after-begin", "before-end")),
+    
+    p("As long as the uploaded file remains in the same format, updated versions of it, containing new data may be uploaded in place of the original."),
+    
     fileInput("file", NULL, accept = c(".csv")),
     
     linebreaks(1),
+    
+    p("This button generates the report."), 
     
     downloadButton("download_report", label = "Generate report")
            
@@ -56,7 +68,8 @@ server <- function(input, output, session) {
           "report.rmd",
           output_file = file, 
           params = params, 
-          envir = new.env(parent = globalenv())
+          envir = new.env(parent = globalenv()), 
+          quiet = TRUE
         )
       }
     )

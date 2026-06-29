@@ -3,7 +3,7 @@
     "path": "~/R/amazon_sales_data/app.R",
     "project_path": "app.R",
     "type": "r_source",
-    "hash": "282528790",
+    "hash": "0",
     "contents": "",
     "dirty": false,
     "created": 1781773043930.0,
@@ -12,15 +12,15 @@
     "properties": {
         "source_window_id": "",
         "Source": "Source",
-        "cursorPosition": "31,4",
-        "scrollLine": "0"
+        "cursorPosition": "30,7",
+        "scrollLine": "25"
     },
     "folds": "",
-    "lastKnownWriteTime": 1782208614,
+    "lastKnownWriteTime": 1782697958,
     "encoding": "UTF-8",
     "collab_server": "",
     "source_window": "",
-    "last_content_update": 1782208614513,
+    "last_content_update": 1782697958382,
     "read_only": false,
     "read_only_alternatives": []
 }
