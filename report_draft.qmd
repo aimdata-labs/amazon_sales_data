@@ -162,7 +162,7 @@ Amazon ratings, [similar](https://aimdata-labs.github.io/google_trip_reviews_kl_
 ```{r warning=FALSE, message=FALSE}
 
 amazon |> 
-  # Filtering out product types with less than 1000 reviews 
+  # Filtering out product types with less than 1000 ratings 
   filter(product_type %out% c("AVReceivers&Amplifiers", "SATACables", "3DGlasses", 
                               "Earpads", "StovetopEspressoPots", "YogurtMakers", 
                               "StandMixers", "ElectricGrinders", "ColouredPaper", 
@@ -439,6 +439,12 @@ Crosstalk doesn't seem to be working. Not sure why.
 ```{r out.height="100%", out.height="100%", fig.width=7.8}
 
 price_discount_categories_plot <- amazon |> 
+  # Filtering out product types with less than 1000 ratings 
+  filter(product_type %out% c("AVReceivers&Amplifiers", "SATACables", "3DGlasses", 
+                              "Earpads", "StovetopEspressoPots", "YogurtMakers", 
+                              "StandMixers", "ElectricGrinders", "ColouredPaper", 
+                              "RotiMakers", "InternalHardDrives", "TraditionalLaptops", 
+                              "PhoneCharms", "TowerSpeakers", "StreamingClients")) |>
   group_by(category, product_type) |> 
   summarise(
     mean_discount = mean(discount_percentage, na.rm = TRUE), 
@@ -544,4 +550,136 @@ Maybe we should try and re-scale the review scores
 
 The meaninglessness of the word "quality". 
 
+
+```{r}
+amazon_words <- amazon |> 
+  select(review_id, review_content, user_id, category, sub_category, product_type) |>
+  unnest_tokens(word, review_content) |> 
+  anti_join(stop_words, by = "word") |> 
+  filter(str_detect(word, "[a-z]")) 
+```
+
+
+
+```{r}
+ amazon_words |> 
+  # Filtering out product types with less than 1000 ratings 
+  filter(product_type %out% c("AVReceivers&Amplifiers", "SATACables", "3DGlasses", 
+                              "Earpads", "StovetopEspressoPots", "YogurtMakers", 
+                              "StandMixers", "ElectricGrinders", "ColouredPaper", 
+                              "RotiMakers", "InternalHardDrives", "TraditionalLaptops", 
+                              "PhoneCharms", "TowerSpeakers", "StreamingClients")) |>
+  mutate(is_quality = ifelse(word == "quality", 1, 0)) |> 
+  group_by(product_type, review_id) |> 
+  summarise(
+    is_quality = sum(is_quality), 
+    all_words = n(), 
+    .groups = "drop") |>
+  mutate(mentions_quality = ifelse(is_quality > 0, 1, 0), 
+         count = 1) |> 
+  group_by(product_type) |> 
+  summarise(mentions_quality = sum(mentions_quality), 
+            review_count = sum(count), 
+            .groups = "drop") |> 
+  mutate(quality_pc = mentions_quality / review_count) |> 
+  ggplot(aes(x = quality_pc)) + 
+  geom_histogram()
+```
+
+
+```{r}
+quality_plot <- amazon_words |> 
+  # Filtering out product types with less than 1000 ratings 
+  filter(product_type %out% c("AVReceivers&Amplifiers", "SATACables", "3DGlasses", 
+                              "Earpads", "StovetopEspressoPots", "YogurtMakers", 
+                              "StandMixers", "ElectricGrinders", "ColouredPaper", 
+                              "RotiMakers", "InternalHardDrives", "TraditionalLaptops", 
+                              "PhoneCharms", "TowerSpeakers", "StreamingClients")) |>
+  mutate(is_quality = ifelse(word == "quality", 1, 0)) |> 
+  group_by(product_type) |> 
+  summarise(
+    is_quality = sum(is_quality), 
+    all_words = n(), 
+    .groups = "drop") |> 
+  mutate(quality_pc = is_quality / all_words) |> 
+  left_join(
+    amazon |> 
+      group_by(product_type, category) |> 
+      summarise(mean_discounted_price = mean(discounted_price, na.rm = TRUE), 
+                mean_discount = mean(discount_percentage, na.rm = TRUE),
+                .groups = "drop"), 
+    by = "product_type"
+  ) |> 
+  ggplot(aes(x = mean_discounted_price, y = quality_pc)) + 
+  geom_smooth(method = "lm", alpha = .3) +
+  geom_point(aes(colour = category, 
+                 text = paste0(
+                   "Product type: ", product_type, ",", "\n", 
+                   "Category: ", category, ",", "\n", 
+                   "Mean discounted price (USD): ", round(mean_discounted_price, 2), ",", "\n",
+                   "Mean discount: ", round(mean_discount * 100, 2), "%"
+                 ))) + 
+  scale_x_log10(breaks = c(1, 3, 10, 30, 100, 300)) + 
+  scale_colour_viridis_d(option = "turbo") + 
+  scale_y_continuous(labels = percent) + 
+  labs(
+    title = "Percentage of review text mentioning 'Quality'",
+    x = "Mean discounted price in USD", 
+    y = "% of words in reviews that are 'Quality'", 
+    colour = "Double-click to\nselect or reset"
+  )
+
+ggplotly(quality_plot, tooltip = c("text")) |> 
+  layout(height = 500, width = 800, 
+         margin = list(t = 50)) |> 
+  config(displayModeBar = FALSE)
+```
+
+<br>
+
+Quality is ephemeral? 
+Quality is unclear
+
+Which words are mentioned when it comes to more expensive products? 
+
+## Reference tables
+
+```{r}
+amazon |> 
+  filter(!is.na(rating)) |> 
+  group_by(category, sub_category, product_type, discounted_price, rating) |> 
+  summarise(
+    rating_count = sum(rating_count), 
+    .groups = "drop") |>
+  mutate(total_price = discounted_price * rating_count, 
+         total_rating = rating * rating_count) |> 
+  group_by(category, sub_category, product_type) |> 
+  summarise(
+    total_price = sum(total_price), 
+    total_rating = sum(total_rating), 
+    rating_count = sum(rating_count), 
+    .groups = "drop"
+  ) |> 
+  mutate(mean_discounted_price = round(total_price / rating_count, 2), 
+         mean_rating = round(total_rating / rating_count, 2)) |> 
+  select(-total_price, -total_rating) |> 
+  rename(
+    Category = category, 
+    `Sub-category` = sub_category, 
+    `Product type` = product_type, 
+    `Num. ratings` = rating_count, 
+    `Mean discounted price` = mean_discounted_price, 
+    `Mean rating` = mean_rating
+  ) |> 
+  datatable(filter = list(position = "top", clear = FALSE),
+            options = list(pageLength = 10, scrollX = TRUE),
+            caption = htmltools::tags$caption(style = "caption-side: top;
+                                              text-align: center; font-size: 140%;",
+                                              "Reference table for product types"))
+
+```
+
+```{r}
+amazon |> distinct(review_id) |> nrow() |> format(big.mark = ",")
+```
 

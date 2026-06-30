@@ -16,13 +16,19 @@ ui <- fluidPage(
     
     p("This is an example of a report generator. It accepts one file upload."), 
     
-    p("The file for this example may be downloaded ", 
-      a(href = "https://stackoverflow.com/", "here", 
+    p("The file to be uploaded for this example may be downloaded ", 
+      a(href = "https://github.com/aimdata-labs/amazon_sales_data/blob/main/data/amazon.csv", "here", 
         .noWS = "outside"), 
       ".", 
       .noWS = c("after-begin", "before-end")),
     
-    p("As long as the uploaded file remains in the same format, updated versions of it, containing new data may be uploaded in place of the original."),
+    p("It may also be copied from ", 
+      a(href = "https://github.com/aimdata-labs/amazon_sales_data/raw/refs/heads/main/data/amazon.csv", "here", 
+        .noWS = "outside"), 
+      ".", 
+      .noWS = c("after-begin", "before-end")),
+    
+    p("As long as the uploaded file remains in the same format, updated versions of it containing new data may be uploaded in place of the original."),
     
     fileInput("file", NULL, accept = c(".csv")),
     
@@ -33,7 +39,6 @@ ui <- fluidPage(
     downloadButton("download_report", label = "Generate report")
            
        )
-
 
 # Define server logic required to draw a histogram
 server <- function(input, output, session) {

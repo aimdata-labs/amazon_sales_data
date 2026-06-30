@@ -3,11 +3,7 @@ title: "Amazon sales"
 subtitle: "Sales report"
 author: "Sean Ng"
 organization: "AIMdata"
-date: '`r format(Sys.Date())`'
-output: html_document: 
-  self_contained: TRUE
-params: 
-  dataset: NULL
+date-modified: "18 May 2026"
 execute: 
   echo: false
 ---
@@ -21,16 +17,19 @@ knitr::opts_chunk$set(echo = FALSE,
 
 
 library(tidyverse)
+library(here)
 library(janitor)
 library(scales)
+library(tidytext)
 library(patchwork)
+library(kableExtra)
 library(viridis)
 library(stringr)
-library(broom)
 library(ggh4x)
 library(plotly)
 library(ggrepel)
-
+library(DT)
+library(crosstalk)
 
 `%out%` <- Negate(`%in%`)
 options(scipen = 100)
@@ -48,17 +47,10 @@ last_comma <- function(x, sep = ","){
 }
 ```
 
-## Introduction 
+Fx rates come from here[https://www.exchangerates.org.uk/USD-INR-spot-exchange-rates-history-2023.html], average rate for 2023
 
-This is a summary report of [sales data](https://www.kaggle.com/datasets/karkavelrajaj/amazon-sales-dataset) from Amazon India compiled by [Karkavelaraja J.](https://www.linkedin.com/in/karkavelraja-j-a758031b0/) 
-
-The dataset contains more than 1,000 Amazon product ratings and reviews from 2023. 
-
-<br><br><br>
 
 ```{r}
-# Fx rates come from here[https://www.exchangerates.org.uk/USD-INR-spot-exchange-rates-history-2023.html], the average rate for 2023 has been used. 
-
 usd_to_inr <- 82.5738
 
 amazon <- read_csv("./data/amazon.csv") |> 
@@ -88,14 +80,13 @@ amazon <- amazon |>
   left_join(
     categories, by = "product_id"
   )
+
 ```
+
 
 
 ## Product types 
 
-The plot below shows the most-rated (and antecedently, the most-purchased, given that all ratings require a purchase) product types on Amazon India. In-ear earphones are the most popular product type on Amazon India, followed by USB cables, smartphones and HDMI cables. 
-
-<br> 
 
 ```{r}
 amazon |> 
@@ -119,9 +110,13 @@ amazon |>
 
 <br>
 
-Electronics, in general, seem to be the most popular category of products on Amazon India. This post-modern age does seem to require and generate an excess of electronic detritus. It would be interesting to compare this other online sales platforms there. 
 
-The plot below provides additional detail and shows the 10 most popular product types by sub-category. As is expected, many sub-categories are dominated by one or two large product types, with a "long tail" of more miscellaneous options. 
+
+In-ear earphones are the most popular product type on Amazon India (given that you need to make a purchase before you can give a rating), followed by USB cables, smartphones and HDMI cables. 
+
+Electronics, in general, seem to be the most popular category of products on Amazon India. It would be interesting to compare this other online sales platforms there. 
+
+The plot below breaks down the most popular product types by sub-category. 
 
 <br>
 
@@ -156,6 +151,8 @@ amazon |>
 
 <br><br><br>
 
+
+
 ## Price and ratings
 
 Amazon ratings, [similar](https://aimdata-labs.github.io/google_trip_reviews_kl_site/) to other online reviews on other platforms, are heavily-skewed towards the high-end. 
@@ -165,7 +162,7 @@ Amazon ratings, [similar](https://aimdata-labs.github.io/google_trip_reviews_kl_
 ```{r warning=FALSE, message=FALSE}
 
 amazon |> 
-  # Filtering out product types with less than 1000 reviews 
+  # Filtering out product types with less than 1000 ratings 
   filter(product_type %out% c("AVReceivers&Amplifiers", "SATACables", "3DGlasses", 
                               "Earpads", "StovetopEspressoPots", "YogurtMakers", 
                               "StandMixers", "ElectricGrinders", "ColouredPaper", 
@@ -214,53 +211,128 @@ amazon |>
 
 <br>
 
-Most product sub-categories demonstrate very little relationship between price and rating, or, higher prices do not always translate to higher product ratings. 
+```{r fig.height=6}
+amazon |> 
+  filter(
+    product_type %out% (amazon |>
+      count(product_type, sort = TRUE) |>
+      filter(n == 1) |>
+      pull(product_type))
+  ) |> 
+  group_by(category, product_type, rating) |>  
+  summarise(
+    rating_count = sum(rating_count, na.rm = TRUE),
+    discounted_price = mean(discounted_price, na.rm = TRUE)
+  ) |> 
+  mutate(
+    rating_total = rating * rating_count, 
+    price_total = discounted_price * rating_count
+  ) |> 
+  group_by(category, product_type) |> 
+  summarise(
+    rating_total = sum(rating_total), 
+    price_total = sum(price_total), 
+    rating_count = sum(rating_count), 
+    .groups = "drop"
+  ) |>  
+  mutate(mean_rating = rating_total / rating_count, 
+         mean_discounted_price = price_total / rating_count) |> 
+  mutate(label = ifelse(rating_count > 100000, product_type, "")) |> 
+  ggplot(aes(x = mean_discounted_price, 
+             y = mean_rating)) + 
+  geom_smooth(method = "lm", 
+              alpha = .5) + 
+  geom_point(aes(colour = category, 
+                 size = rating_count), 
+             alpha = .7, 
+             pch = 16) + 
+  geom_text_repel(aes(label = label), 
+                  size = 1.8) +
+  scale_x_log10(breaks = c(1, 3, 10, 30, 100, 300)) + 
+  scale_size_continuous(range = c(1, 10), 
+                        labels = comma) +
+  scale_colour_viridis_d(option = "turbo") + 
+  labs(x = "Mean discounted price (USD)", 
+       y = "Mean rating", 
+       title = "Mean ratings and prices of Amazon products by category", 
+       subtitle = "Tablets, power accessories and computer components are the most highly-reviewed", 
+       colour = "Category", 
+       size = "Number of ratings") + 
+  guides(colour = guide_legend(override.aes = list(alpha = 1), 
+                               order = 1))
+  
+```
+
+
 
 <br>
 
-```{r warning=FALSE, fig.height=8}
+Most product sub-categories demonstrate very little relationship between price and rating. 
+
+For most product categories, higher prices do not always convert to higher product ratings
+
+<br> 
+
+```{r warning=FALSE, message=FALSE, fig.height=8}
 
 backgrounds <- 
   list(
     element_rect(fill = "#780000"), 
     element_rect(fill = "#780000"),
-    element_rect(fill = "#669bbc"),
-    element_rect(fill = "#669bbc"),
-    element_rect(fill = "#669bbc"),
-    element_rect(fill = "#669bbc"),
-    element_rect(fill = "#669bbc"),
-    element_rect(fill = "#669bbc"),
     element_rect(fill = "#780000"),
+    element_rect(fill = "#780000"),
+    element_rect(fill = "#780000"),
+    element_rect(fill = "#669bbc"),
+    element_rect(fill = "#669bbc"),
+    element_rect(fill = "#669bbc"),
+    element_rect(fill = "#669bbc"),
+    element_rect(fill = "#669bbc"),
+    element_rect(fill = "#669bbc"),
+    element_rect(fill = "#669bbc"),
     element_rect(fill = "#669bbc"),
     element_rect(fill = "#606c38"),
-    element_rect(fill = "#003049"),
-    element_rect(fill = "#669bbc"),
-    element_rect(fill = "#780000"),
-    element_rect(fill = "#780000"),
-    element_rect(fill = "#003049"),
-    element_rect(fill = "#003049"),
+    element_rect(fill = "#606c38"),
+    element_rect(fill = "#606c38"),
+    element_rect(fill = "#606c38"),
     element_rect(fill = "#003049")
   )
+
+category_list <- c(
+"Accessories&Peripherals",
+"Components",
+"ExternalDevices&DataStorage",
+"NetworkingDevices", 
+"Printers,Inks&Accessories",
+
+"Accessories",
+"Cameras&Photography",
+"GeneralPurposeBatteries&BatteryChargers",
+"Headphones,Earbuds&Accessories",
+"HomeAudio",
+"HomeTheater,TV&Video",
+"Mobiles&Accessories",
+"WearableTechnology",
+
+"CraftMaterials",
+"Heating,Cooling&AirQuality",
+"HomeStorage&Organization",
+"Kitchen&HomeAppliances",
+
+"OfficePaperProducts")
 
 amazon |> 
   filter(!is.na(rating_count)) |> 
   group_by(category, sub_category, rating, discounted_price) |>
   summarise(rating_count = mean(rating_count), 
             .groups = "drop") |> 
-  filter(sub_category %in% c("Accessories", "Accessories&Peripherals", 
-                              "Cameras&Photography", "Components", 
-                              "CraftMaterials",
-                              "ExternalDevices&DataStorage", 
-                              "GeneralPurposeBatteries&BatteryChargers", 
-                              "Headphones,Earbuds&Accessories",
-                              "Heating,Cooling&AirQuality", 
-                              "HomeAudio", "HomeStorage&Organization", 
-                              "HomeTheater,TV&Video", 
-                              "Kitchen&HomeAppliances", 
-                              "Mobiles&Accessories", 
-                              "NetworkingDevices", "OfficePaperProducts", 
-                              "Printers,Inks&Accessories", 
-                              "WearableTechnology")) |> 
+  filter(sub_category %in% category_list) |>
+  left_join(
+    category_list |>
+      as.data.frame() |>
+      mutate(level = seq(1:18)), 
+    by = c("sub_category" = "category_list")
+  ) |> 
+  mutate(sub_category = fct_reorder(sub_category, level)) |> 
   ggplot(aes(x = discounted_price, y = rating)) + 
   geom_point() + 
   geom_smooth() + 
@@ -270,16 +342,37 @@ amazon |>
                background_x = backgrounds)) + 
   scale_x_log10() + 
   labs(title = "Amazon product ratings and prices", 
-       subtitle = "Categories are: Computers & Accessories; Electronics; Office products; and Home & Kitchen")
+       subtitle = "Categories are: Computers & Accessories (red); Electronics (light blue); Office products (green); and Home & Kitchen (dark blue", 
+       x = "Discounted price", 
+       y = "Rating")
 ```
 
 <br><br><br>
 
+
+
 ## Discounts
 
-"Discounts" are pervasive part of online (and offline) marketing. We see from the plot below that almost all products on Amazon India are discounted, displaying in full the *cheapness* of this promotional strategy. 
+Almost all products on Amazon India are discounted. 
 
-From the plot below, it does, however, seem that heavily-discounted items were less satisfactory to consumers. It could also be that low-quality and unpopular products were discounted so that they would sell. 
+```{r}
+amazon |> 
+  filter(!is.na(rating)) |> 
+  group_by(rating, discount_percentage) |> 
+  summarise(count = n()) |> 
+  ggplot(aes(x = discount_percentage, y = rating))  + 
+  geom_smooth(method = "lm") +
+  geom_point(aes(size = count), 
+             alpha = .6, 
+             pch = 16) + 
+  scale_y_continuous(breaks = seq(2, 5, .5)) + 
+  scale_x_continuous(labels = percent, breaks = seq(0, 1, .1)) +
+  labs(x = "Discount percentage", 
+       y = "Rating", 
+       size = "Number\nof ratings", 
+       title = "Customer ratings against percentage discount of Amazon items", 
+       subitle = "Almost all items sold on Amazon India are discounted")
+```
 
 <br>
 
@@ -328,13 +421,30 @@ amazon |>
 
 <br>
 
-We can investigate this phenomenon in a bit more detail using the interactive plot below. 
+If anything, the most highly-discounted items are less satisfactory to customers (having slightly lower ratings). It could also be that unsatisfactory and unpopular products have also been discounted so they would sell. 
 
-<br>
+Amongst non-discounted items (at 0% on the x-axis), there does seem to be a general range between 4 and 4.5 stars. 
+
+What are the most commonly-discounted products
+
+
+This code creates fewer objects in the environment, but it's still not really working well
+
+So... crosstalk won't really work for histograms or freqpolies where the data is aggregated
+
+Crosstalk doesn't seem to be working. Not sure why. 
+
+
 
 ```{r out.height="100%", out.height="100%", fig.width=7.8}
 
 price_discount_categories_plot <- amazon |> 
+  # Filtering out product types with less than 1000 ratings 
+  filter(product_type %out% c("AVReceivers&Amplifiers", "SATACables", "3DGlasses", 
+                              "Earpads", "StovetopEspressoPots", "YogurtMakers", 
+                              "StandMixers", "ElectricGrinders", "ColouredPaper", 
+                              "RotiMakers", "InternalHardDrives", "TraditionalLaptops", 
+                              "PhoneCharms", "TowerSpeakers", "StreamingClients")) |>
   group_by(category, product_type) |> 
   summarise(
     mean_discount = mean(discount_percentage, na.rm = TRUE), 
@@ -375,7 +485,16 @@ ggplotly(price_discount_categories_plot, tooltip = c("text")) |>
 
 Office products tend to have the lowest discounts, though many of these appear to be price-elastic low-cost staples which do not require additional incentives (such as having massive discounts) to attract sales. 
 
-There is a tendency for more expensive items to have lower discounts. Or perhaps, it is that many heavily "discounted" items have dishonest "actual" prices: for instance, phone charms (the most discounted product type on Amazon India) have an average "actual" cost of USD 12.10. This is a nonsensical price, but it does allow them to be offered at the average discounted price of USD 1.20, with a 90% discount. 
+There is a tendency for more expensive items to have lower discounts, or perhaps, many heavily discounted items have dishonest "actual" prices: for instance, phone charms (the most discounted product type on Amazon India) have an average cost USD 12.10, but are offered at USD 1.20 at a discount of 90%. It is quite difficult to believe that a phone charm should cost USD 12.10, especially in India. 
+
+We also see that the mean discount 
+
+
+<br>
+
+Most product sub-categories are largely defined by just a few major product types.
+
+Amongst the most highly-rated (and most-purchased, since you need a purchase to make a rating) product types are USB calbes, HDMI cables, smartphones, MicroSDs, pen drives, smartwatches, wireless USB adapters and in-ear earbuds. 
 
 <br><br><br>
 
@@ -397,15 +516,7 @@ amazon_bigrams <- amazon |>
   
 ```
 
-Let us now take a look at the most common bigrams (two words) per product sub-category. 
 
-These bigrams provide insight into what consumers believe to be the most relevant considerations when purchasing a type of product. 
-
-For instance, in the Headphones and Earbuds sub-category, we see the that the top two bigrams are "sound quality" and "noise cancellation", followed by "1 hour" and "minutes approx", which are probably references to the charging speed of wireless earbuds. 
-
-
-
-<br>
 
 ```{r fig.height = 9}
 amazon_bigrams |> 
@@ -431,5 +542,144 @@ amazon_bigrams |>
         strip.text = element_text(size = 7))
 ```
 
-<br> 
+<br>
+
+Given the enshittified state of consumer products, do people have an accurate idea of what quality is? 
+
+Maybe we should try and re-scale the review scores
+
+The meaninglessness of the word "quality". 
+
+
+```{r}
+amazon_words <- amazon |> 
+  select(review_id, review_content, user_id, category, sub_category, product_type) |>
+  unnest_tokens(word, review_content) |> 
+  anti_join(stop_words, by = "word") |> 
+  filter(str_detect(word, "[a-z]")) 
+```
+
+
+
+```{r}
+ amazon_words |> 
+  # Filtering out product types with less than 1000 ratings 
+  filter(product_type %out% c("AVReceivers&Amplifiers", "SATACables", "3DGlasses", 
+                              "Earpads", "StovetopEspressoPots", "YogurtMakers", 
+                              "StandMixers", "ElectricGrinders", "ColouredPaper", 
+                              "RotiMakers", "InternalHardDrives", "TraditionalLaptops", 
+                              "PhoneCharms", "TowerSpeakers", "StreamingClients")) |>
+  mutate(is_quality = ifelse(word == "quality", 1, 0)) |> 
+  group_by(product_type, review_id) |> 
+  summarise(
+    is_quality = sum(is_quality), 
+    all_words = n(), 
+    .groups = "drop") |>
+  mutate(mentions_quality = ifelse(is_quality > 0, 1, 0), 
+         count = 1) |> 
+  group_by(product_type) |> 
+  summarise(mentions_quality = sum(mentions_quality), 
+            review_count = sum(count), 
+            .groups = "drop") |> 
+  mutate(quality_pc = mentions_quality / review_count) |> 
+  ggplot(aes(x = quality_pc)) + 
+  geom_histogram()
+```
+
+
+```{r}
+quality_plot <- amazon_words |> 
+  # Filtering out product types with less than 1000 ratings 
+  filter(product_type %out% c("AVReceivers&Amplifiers", "SATACables", "3DGlasses", 
+                              "Earpads", "StovetopEspressoPots", "YogurtMakers", 
+                              "StandMixers", "ElectricGrinders", "ColouredPaper", 
+                              "RotiMakers", "InternalHardDrives", "TraditionalLaptops", 
+                              "PhoneCharms", "TowerSpeakers", "StreamingClients")) |>
+  mutate(is_quality = ifelse(word == "quality", 1, 0)) |> 
+  group_by(product_type) |> 
+  summarise(
+    is_quality = sum(is_quality), 
+    all_words = n(), 
+    .groups = "drop") |> 
+  mutate(quality_pc = is_quality / all_words) |> 
+  left_join(
+    amazon |> 
+      group_by(product_type, category) |> 
+      summarise(mean_discounted_price = mean(discounted_price, na.rm = TRUE), 
+                mean_discount = mean(discount_percentage, na.rm = TRUE),
+                .groups = "drop"), 
+    by = "product_type"
+  ) |> 
+  ggplot(aes(x = mean_discounted_price, y = quality_pc)) + 
+  geom_smooth(method = "lm", alpha = .3) +
+  geom_point(aes(colour = category, 
+                 text = paste0(
+                   "Product type: ", product_type, ",", "\n", 
+                   "Category: ", category, ",", "\n", 
+                   "Mean discounted price (USD): ", round(mean_discounted_price, 2), ",", "\n",
+                   "Mean discount: ", round(mean_discount * 100, 2), "%"
+                 ))) + 
+  scale_x_log10(breaks = c(1, 3, 10, 30, 100, 300)) + 
+  scale_colour_viridis_d(option = "turbo") + 
+  scale_y_continuous(labels = percent) + 
+  labs(
+    title = "Percentage of review text mentioning 'Quality'",
+    x = "Mean discounted price in USD", 
+    y = "% of words in reviews that are 'Quality'", 
+    colour = "Double-click to\nselect or reset"
+  )
+
+ggplotly(quality_plot, tooltip = c("text")) |> 
+  layout(height = 500, width = 800, 
+         margin = list(t = 50)) |> 
+  config(displayModeBar = FALSE)
+```
+
+<br>
+
+Quality is ephemeral? 
+Quality is unclear
+
+Which words are mentioned when it comes to more expensive products? 
+
+## Reference tables
+
+```{r}
+amazon |> 
+  filter(!is.na(rating)) |> 
+  group_by(category, sub_category, product_type, discounted_price, rating) |> 
+  summarise(
+    rating_count = sum(rating_count), 
+    .groups = "drop") |>
+  mutate(total_price = discounted_price * rating_count, 
+         total_rating = rating * rating_count) |> 
+  group_by(category, sub_category, product_type) |> 
+  summarise(
+    total_price = sum(total_price), 
+    total_rating = sum(total_rating), 
+    rating_count = sum(rating_count), 
+    .groups = "drop"
+  ) |> 
+  mutate(mean_discounted_price = round(total_price / rating_count, 2), 
+         mean_rating = round(total_rating / rating_count, 2)) |> 
+  select(-total_price, -total_rating) |> 
+  rename(
+    Category = category, 
+    `Sub-category` = sub_category, 
+    `Product type` = product_type, 
+    `Num. ratings` = rating_count, 
+    `Mean discounted price` = mean_discounted_price, 
+    `Mean rating` = mean_rating
+  ) |> 
+  datatable(filter = list(position = "top", clear = FALSE),
+            options = list(pageLength = 10, scrollX = TRUE),
+            caption = htmltools::tags$caption(style = "caption-side: top;
+                                              text-align: center; font-size: 140%;",
+                                              "Reference table for product types"))
+
+```
+
+```{r}
+amazon |> distinct(review_id) |> nrow() |> format(big.mark = ",")
+```
 

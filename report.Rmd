@@ -4,11 +4,12 @@ subtitle: "Sales report"
 author: "Sean Ng"
 organization: "AIMdata"
 date: '`r format(Sys.Date())`'
-output: html_document: 
-  self_contained: TRUE
-params: 
+output:
+  html_document:
+    self-contained: true
+params:
   dataset: NULL
-execute: 
+execute:
   echo: false
 ---
 
@@ -30,6 +31,8 @@ library(broom)
 library(ggh4x)
 library(plotly)
 library(ggrepel)
+library(DT)
+library(tidytext)
 
 
 `%out%` <- Negate(`%in%`)
@@ -48,15 +51,7 @@ last_comma <- function(x, sep = ","){
 }
 ```
 
-## Introduction 
-
-This is a summary report of [sales data](https://www.kaggle.com/datasets/karkavelrajaj/amazon-sales-dataset) from Amazon India compiled by [Karkavelaraja J.](https://www.linkedin.com/in/karkavelraja-j-a758031b0/) 
-
-The dataset contains more than 1,000 Amazon product ratings and reviews from 2023. 
-
-<br><br><br>
-
-```{r}
+```{r data}
 # Fx rates come from here[https://www.exchangerates.org.uk/USD-INR-spot-exchange-rates-history-2023.html], the average rate for 2023 has been used. 
 
 usd_to_inr <- 82.5738
@@ -90,6 +85,14 @@ amazon <- amazon |>
   )
 ```
 
+## Introduction 
+
+This is a summary report of [sales data](https://www.kaggle.com/datasets/karkavelrajaj/amazon-sales-dataset) from Amazon India compiled by [Karkavelaraja J.](https://www.linkedin.com/in/karkavelraja-j-a758031b0/) 
+
+The dataset contains `r amazon |> distinct(review_id) |> nrow() |> format(big.mark = ",")` Amazon product ratings and reviews from 2023. 
+
+<br><br><br>
+
 
 ## Product types 
 
@@ -97,7 +100,7 @@ The plot below shows the most-rated (and antecedently, the most-purchased, given
 
 <br> 
 
-```{r}
+```{r product-type-bar}
 amazon |> 
   group_by(category, product_type) |> 
   summarise(rating_count = sum(rating_count, na.rm = TRUE), 
@@ -126,7 +129,7 @@ The plot below provides additional detail and shows the 10 most popular product 
 <br>
 
 
-```{r fig.height=8, fig.width=9}
+```{r product-type-facet, fig.height=8, fig.width=9}
 amazon |> 
   filter(sub_category %out% c("Tablets", "PowerAccessories", "Laptops", 
                               "Kitchen&Dining", "HomeMedicalSupplies&Equipment", 
@@ -162,7 +165,7 @@ Amazon ratings, [similar](https://aimdata-labs.github.io/google_trip_reviews_kl_
 
 <br>
 
-```{r warning=FALSE, message=FALSE}
+```{r rating-scatter, warning=FALSE, message=FALSE}
 
 amazon |> 
   # Filtering out product types with less than 1000 reviews 
@@ -218,7 +221,7 @@ Most product sub-categories demonstrate very little relationship between price a
 
 <br>
 
-```{r warning=FALSE, fig.height=8}
+```{r rating-scatter-facet, warning=FALSE, fig.height=8}
 
 backgrounds <- 
   list(
@@ -283,7 +286,7 @@ From the plot below, it does, however, seem that heavily-discounted items were l
 
 <br>
 
-```{r}
+```{r discounts-bar}
 amazon |> 
   filter(!is.na(rating)) |> 
   mutate(discount_group = 
@@ -332,7 +335,7 @@ We can investigate this phenomenon in a bit more detail using the interactive pl
 
 <br>
 
-```{r out.height="100%", out.height="100%", fig.width=7.8}
+```{r discount-scatter-plotly, out.height="100%", out.height="100%", fig.width=7.8}
 
 price_discount_categories_plot <- amazon |> 
   group_by(category, product_type) |> 
@@ -382,7 +385,7 @@ There is a tendency for more expensive items to have lower discounts. Or perhaps
 ## Review content
 
 
-```{r}
+```{r bigrams}
 amazon_bigrams <- amazon |> 
   select(review_id, review_content, user_id, category, sub_category, product_type) |>
   unnest_tokens(bigram, review_content, token = "ngrams", n = 2) |>  
@@ -407,7 +410,7 @@ For instance, in the Headphones and Earbuds sub-category, we see the that the to
 
 <br>
 
-```{r fig.height = 9}
+```{r bigrams-sub-category-facet, fig.height = 9}
 amazon_bigrams |> 
   filter(sub_category %out% c("Tablets", "PowerAccessories", "Laptops", 
                               "Kitchen&Dining", "HomeMedicalSupplies&Equipment", 
@@ -431,5 +434,46 @@ amazon_bigrams |>
         strip.text = element_text(size = 7))
 ```
 
-<br> 
+<br>
 
+However, it should still be noted that -- given that online reviews have no objective standards for quality i.e. durability, finishings, comfort -- the idea of "quality" remains very nebulous and subjective. This is likely by design so that consumers are unable to intuit broader manufacturing trends such as overall decreases in standards shifting the goalposts on what a "quality" product is. 
+
+<br><br><br>
+
+
+## Reference tables
+
+```{r reference-table-dt}
+amazon |> 
+  filter(!is.na(rating)) |> 
+  group_by(category, sub_category, product_type, discounted_price, rating) |> 
+  summarise(
+    rating_count = sum(rating_count), 
+    .groups = "drop") |>
+  mutate(total_price = discounted_price * rating_count, 
+         total_rating = rating * rating_count) |> 
+  group_by(category, sub_category, product_type) |> 
+  summarise(
+    total_price = sum(total_price), 
+    total_rating = sum(total_rating), 
+    rating_count = sum(rating_count), 
+    .groups = "drop"
+  ) |> 
+  mutate(mean_discounted_price = round(total_price / rating_count, 2), 
+         mean_rating = round(total_rating / rating_count, 2)) |> 
+  select(-total_price, -total_rating) |> 
+  rename(
+    Category = category, 
+    `Sub-category` = sub_category, 
+    `Product type` = product_type, 
+    `Num. ratings` = rating_count, 
+    `Mean discounted price` = mean_discounted_price, 
+    `Mean rating` = mean_rating
+  ) |> 
+  datatable(filter = list(position = "top", clear = FALSE),
+            options = list(pageLength = 10, scrollX = TRUE),
+            caption = htmltools::tags$caption(style = "caption-side: top;
+                                              text-align: center; font-size: 140%;",
+                                              "Reference table for product types"))
+
+```

@@ -3,7 +3,7 @@
     "path": "~/R/amazon_sales_data/report.Rmd",
     "project_path": "report.Rmd",
     "type": "r_markdown",
-    "hash": "3505630676",
+    "hash": "2786399217",
     "contents": "",
     "dirty": false,
     "created": 1782100551071.0,
@@ -13,15 +13,16 @@
         "tempName": "Untitled1",
         "source_window_id": "",
         "Source": "Source",
-        "cursorPosition": "7,22",
-        "scrollLine": "0"
+        "cursorPosition": "91,89",
+        "scrollLine": "62",
+        "last_setup_crc32": "6d1de67010301587"
     },
     "folds": "",
-    "lastKnownWriteTime": 1782715769,
+    "lastKnownWriteTime": 1782799607,
     "encoding": "UTF-8",
     "collab_server": "",
     "source_window": "",
-    "last_content_update": 1782715769871,
+    "last_content_update": 1782799607053,
     "read_only": false,
     "read_only_alternatives": []
 }
