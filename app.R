@@ -52,9 +52,11 @@ server <- function(input, output, session) {
       filename = paste0("report", format(Sys.Date(), "%Y%m%d"), ".html"), 
       
       content = function(file) {
-        
+
         # Copy qmd to a temp folder so it can be rendered outside the app dir
+        # Not sure which one works properly 
         tempReport <- file.path(tempdir(), "report.Rmd")
+        # tempReport <- tempfile(fileext = ".Rmd")
         file.copy("report.Rmd", tempReport, overwrite = TRUE)
         
         params <- list(dataset = uploaded_data())
@@ -70,7 +72,7 @@ server <- function(input, output, session) {
         # According to Hadley, it's best to create a function and use callr
         # But I haven't figured out how to get it to work yet
         rmarkdown::render(
-          "report.rmd",
+          "report.Rmd",
           output_file = file, 
           params = params, 
           envir = new.env(parent = globalenv()), 

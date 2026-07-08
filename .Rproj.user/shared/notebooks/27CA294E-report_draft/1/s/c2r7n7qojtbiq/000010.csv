@@ -1,6 +1,0 @@
-"0","amazon |> distinct(review_id) |> nrow() |> format(big.mark = "","")
-"
-"1","[1]"
-"1"," ""1,194"""
-"1","
-"
