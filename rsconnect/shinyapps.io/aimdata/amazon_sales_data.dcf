@@ -5,9 +5,9 @@ account: aimdata
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 17584517
-bundleId: 12238569
+bundleId: 12274371
 url: https://aimdata.shinyapps.io/amazon_sales_data/
 version: 1
 asMultiple: FALSE
 asStatic: FALSE
-ignoredFiles: .gitattributes|data/amazon.csv|maybe_later/copy.R|maybe_later/maybe_later.R|maybe_later/report_draft.qmd|README.md
+ignoredFiles: .gitattributes|maybe_later/copy.R|maybe_later/maybe_later.R|maybe_later/report_draft.qmd|README.md

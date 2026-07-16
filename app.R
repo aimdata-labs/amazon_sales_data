@@ -16,17 +16,19 @@ ui <- fluidPage(
     
     p("This is an example of a report generator. It accepts one file upload."), 
     
-    p("The file to be uploaded for this example may be downloaded ", 
-      a(href = "https://github.com/aimdata-labs/amazon_sales_data/blob/main/data/amazon.csv", "here", 
-        .noWS = "outside"), 
-      ".", 
-      .noWS = c("after-begin", "before-end")),
+    p("The file to be uploaded for this example may be downloaded here:"),
     
-    p("It may also be copied from ", 
-      a(href = "https://github.com/aimdata-labs/amazon_sales_data/raw/refs/heads/main/data/amazon.csv", "here", 
-        .noWS = "outside"), 
-      ".", 
-      .noWS = c("after-begin", "before-end")),
+    downloadButton("amazon_raw_data", label = "Download data"),
+    
+    # linebreaks(1), 
+    # 
+    # p("It may also be copied from ", 
+    #   a(href = "https://github.com/aimdata-labs/amazon_sales_data/raw/refs/heads/main/data/amazon.csv", "here", 
+    #     .noWS = "outside"), 
+    #   ".", 
+    #   .noWS = c("after-begin", "before-end")),
+    
+    linebreaks(2), 
     
     p("As long as the uploaded file remains in the same format, updated versions of it containing new data may be uploaded in place of the original."),
     
@@ -42,6 +44,15 @@ ui <- fluidPage(
 
 # Define server logic required to draw a histogram
 server <- function(input, output, session) {
+  
+  amazon_raw_data <- read_csv("./data/amazon.csv")
+  
+  output$amazon_raw_data <- downloadHandler(
+    filename = "amazon.csv", 
+    content = function(file) {
+      write_csv(amazon_raw_data, file)
+    }
+  )
   
   uploaded_data <- reactive({
     req(input$file)
