@@ -14,12 +14,13 @@ ui <- fluidPage(
     
     linebreaks(1),
     
-    p("This is an example of a report generator. It accepts one file upload."), 
+    h3("This is an example of a report generator. It accepts one file upload."), 
     
     p("The file to be uploaded for this example may be downloaded here:"),
     
     downloadButton("amazon_raw_data", label = "Download data"),
     
+    # Doubtful that clients will know how to interact with github
     # linebreaks(1), 
     # 
     # p("It may also be copied from ", 
@@ -28,17 +29,31 @@ ui <- fluidPage(
     #   ".", 
     #   .noWS = c("after-begin", "before-end")),
     
-    linebreaks(2), 
+    # https://aimdata.shinyapps.io/amazon_sales_data/
     
-    p("As long as the uploaded file remains in the same format, updated versions of it containing new data may be uploaded in place of the original."),
+    linebreaks(3), 
+    
+    h3("Upload the file you downloaded above."),
+    
+    p("As long as the uploaded file remains in the same format i.e. with the same number of columns and with column names unchanged, updated versions may be uploaded in place of the original, generating a new version of the report with the updated data."),
     
     fileInput("file", NULL, accept = c(".csv")),
     
     linebreaks(1),
     
-    p("This button generates the report."), 
+    h3("This button generates the report."), 
     
-    downloadButton("download_report", label = "Generate report")
+    p("This may take a few minutes."), 
+    
+    downloadButton("download_report", label = "Generate report"), 
+    
+    linebreaks(3), 
+    
+    p("NOTE: The download produced by the button above is an .html file, which allows for interactive elements. This file, once saved, will open in your web browser. However, Microsoft word or PDF documents can also be produced, if preferred. The report generated shows a range of charts that should serve as an example of what you might request in your own reports. There are two interactive elements towards report -- an interactive scatterplot and a searchable reference table; neither of these elements will be available in static Word or PDF documents."),
+    
+    linebreaks(1), 
+    
+    p("This interface can also be customised: allowing for uploads and downloads. For instance, if you just wanted to upload raw data and download a cleaned dataset, that would also be possible. This is just a simple interface to run a script or even multiple scripts; what each script does is fairly flexible.")
            
        )
 
